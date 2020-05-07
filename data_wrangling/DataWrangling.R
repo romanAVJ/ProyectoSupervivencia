@@ -90,7 +90,7 @@ rm(municipios, pobrezaurbana, coneval_data, entidades)
 
 # ruta donde esta guardado el archivo del link --Customers Data--
 # archivo "customers.rds"
-clientes<-read_rds("C:/Users/ilan2/Documents/proyectos/ITAM/Analisis_de_supervivencia/Data/customers.rds")
+clientes<-read_rds(path = 'customers.rds')
 
 clientes_en_mora<-clientes %>% 
   select(inegi_id, trnsx_id, fecha, fecha_de_vencimiento, dias_en_mora) %>% 
