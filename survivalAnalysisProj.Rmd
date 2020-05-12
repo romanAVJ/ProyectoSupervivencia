@@ -1,0 +1,144 @@
+---
+title: "EDA surv project"
+output: html_notebook
+---
+
+```{r}
+#libraries
+library(dplyr)
+library(ggplot2)
+library(survival)
+library(survminer)
+library(tidyr)
+
+#own functions for survivance analysis
+source('Functions/surv_functions.R')
+source('Functions/EDA_np_functions.R')
+
+```
+
+# EDA
+
+Primero observemos las variables.
+
+```{r}
+# principal table
+clientes <- readRDS("FinalDataSet/transacciones.rds")
+
+# look data set
+# clientes %>% head() %>% knitr::kable()
+```
+
+
+## Análisis Univariado
+
+Observemos primero como se comportan las variables por si mismas y con respecto a sus distintos niveles (factores).
+
+### Número de transacciones
+
+Veamos un la estrucctura de las transacciones
+
+
+```{r}
+# univariate analysis
+#boxplot
+bxplt_trans_ab <- ggplot(data = clientes) +
+                geom_boxplot(mapping = aes(x = factor(Abandono),y = NumTransx, fill = factor(Abandono))) +
+                  theme_minimal()
+
+bxplt_trans_mora <- ggplot(data = clientes) +
+                geom_boxplot(mapping = aes(x = factor(en_mora),y = NumTransx, fill = factor(en_mora))) +
+                  theme_minimal()
+
+#violin plot
+vln_trans_ab <- ggplot(data = clientes) +
+                geom_violin(mapping = aes(x = factor(Abandono),y = NumTransx, fill = factor(Abandono))) +
+                  theme_minimal()
+
+vln_trans_mora <- ggplot(data = clientes) +
+                geom_violin(mapping = aes(x = factor(en_mora),y = NumTransx, fill = factor(en_mora))) +
+                  theme_minimal()
+
+
+
+#both box and violin
+all_trans_mora <-  ggplot(data = clientes, mapping = aes(x = factor(en_mora),y = NumTransx)) +
+                geom_boxplot() +
+                geom_violin(alpha = 0.5) +
+                geom_jitter(alpha = 0.04, col = 'blue') +
+                  theme_minimal()
+
+all_trans_ab <-  ggplot(data = clientes, mapping = aes(x = factor(Abandono),y = NumTransx)) +
+                geom_boxplot() +
+                geom_violin(alpha = 0.5) +
+                geom_jitter(alpha = 0.04, col = 'blue') +
+                  theme_minimal()
+
+all_trans_abAndmora <- all_trans_mora +
+                        facet_grid(. ~ factor(Abandono))
+
+# density estimation
+clientes$NumTransx %>% plt_dnsty(bw = 'nrd0')
+
+
+# rango de pobreza
+bxplt_pobreza_mora <-  clientes %>% 
+                        select(NumTransx, en_mora, Abandono, NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas) %>% 
+                        gather(NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas, key = 'Pobreza', value = 'dummie') %>% 
+                        filter(dummie == '1') %>% 
+                        select(NumTransx:Pobreza) %>% 
+                        ggplot(mapping = aes(factor(en_mora), NumTransx)) +
+                        geom_boxplot() +
+                        geom_violin(alpha = 0.5) +
+                        geom_jitter(alpha = 0.04, col = 'blue') +
+                        facet_grid(. ~ Pobreza) +
+                        theme_bw()
+
+
+
+
+
+
+
+
+
+
+
+
+
+#plot
+all_trans_abAndmora # el que mas me gusta
+all_trans_mora
+all_trans_ab
+bxplt_trans_ab
+bxplt_trans_mora
+vln_trans_ab
+vln_trans_mora
+
+bxplt_pobreza_mora
+
+
+```
+
+### Localización
+
+```{r}
+# mexico lon, lat
+clientes %>% ggplot(mapping = aes(x = lon, y = lat)) + 
+        borders(xlim = c(-130, -110), ylim = c(20, 25)) +
+        geom_point(col = 'red', pch = 16, alpha = 0.2)
+
+# idea2
+
+
+
+```
+
+
+
+
+
+
+
+
+
