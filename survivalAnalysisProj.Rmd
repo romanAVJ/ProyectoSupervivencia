@@ -39,6 +39,8 @@ Observemos primero como se comportan las variables por si mismas y con respecto 
 Veamos un la estrucctura de las transacciones
 
 
+NOTA: HACER LO MISMO PERO PARA LOS DÍAS OBSERVADOS (CON TODAS LAS OBSERVACIONES, DISTINTO AL DE ABAJO QUE ES SOLO UNA MUESTRA Y QUE SE NOTAN CENSURAS Y NO).
+
 ```{r}
 # univariate analysis
 #boxplot
@@ -74,6 +76,13 @@ all_trans_ab <-  ggplot(data = clientes, mapping = aes(x = factor(Abandono),y = 
                 geom_jitter(alpha = 0.04, col = 'blue') +
                   theme_minimal()
 
+all_trans_edo <-  ggplot(data = clientes, mapping = aes(x = factor(Abandono),y = NumTransx)) +
+                geom_boxplot() +
+                geom_violin(alpha = 0.5) +
+                geom_jitter(alpha = 0.04, col = 'blue') +
+                facet_wrap(~ CVE_ENT) +
+                  theme_minimal()
+
 all_trans_abAndmora <- all_trans_mora +
                         facet_grid(. ~ factor(Abandono))
 
@@ -94,31 +103,84 @@ bxplt_pobreza_mora <-  clientes %>%
                         facet_grid(. ~ Pobreza) +
                         theme_bw()
 
+bxplt_pobreza_abandono <-  clientes %>% 
+                        select(NumTransx, en_mora, Abandono, NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas) %>% 
+                        gather(NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas, key = 'Pobreza', value = 'dummie') %>% 
+                        filter(dummie == '1') %>% 
+                        select(NumTransx:Pobreza) %>% 
+                        ggplot(mapping = aes(factor(Abandono), NumTransx)) +
+                        geom_boxplot() +
+                        geom_violin(alpha = 0.5) +
+                        geom_jitter(alpha = 0.04, col = 'blue') +
+                        facet_grid(. ~ Pobreza) +
+                        theme_bw()
 
-
-
-
-
-
-
-
-
-
-
-
-#plot
-all_trans_abAndmora # el que mas me gusta
-all_trans_mora
-all_trans_ab
-bxplt_trans_ab
-bxplt_trans_mora
-vln_trans_ab
-vln_trans_mora
-
-bxplt_pobreza_mora
+bxplt_pobreza_all <-  clientes %>% 
+                        select(NumTransx, en_mora, Abandono, NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas) %>% 
+                        gather(NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas, key = 'Pobreza', value = 'dummie') %>% 
+                        filter(dummie == '1') %>% 
+                        select(NumTransx:Pobreza) %>% 
+                        ggplot(mapping = aes(Pobreza, NumTransx)) +
+                        geom_boxplot() +
+                        geom_violin(alpha = 0.5) +
+                        geom_jitter(alpha = 0.1, col = 'green') +
+                        facet_grid(factor(Abandono) ~ factor(en_mora)) +
+                        theme_bw()
 
 
 ```
+
+### Tiempos de las observaciones
+
+Observemos como se distribuyen los tiempos con y sin censura dependiendo de:
+
+- Rango de pobreza.
+- Mora.
+- Ámbito
+
+
+
+```{r}
+#seed for random sampling
+set.seed(7)
+index <- sample(1:9603,size = 300,replace = F)
+index2 <- sample(1:9603,size = 1000,replace = F)
+#dot plot by censoring
+
+gdot1_times <-  clientes[index,] %>%
+                    mutate(DiasObsrvdos = as.integer(DiasObsrvdos)) %>% 
+                    ggplot(mapping = aes(x = factor(Ambito),y = DiasObsrvdos, fill = factor(Abandono))) +
+                    geom_dotplot( binaxis = 'y',stackdir = 'center', dotsize = 0.5, binwidth = 35, position = position_dodge(0.5)) +
+                    geom_boxplot(position =  position_dodge(0.5), alpha = 0.2)
+
+gdot2_times <-  clientes[index,] %>%
+                    mutate(DiasObsrvdos = as.integer(DiasObsrvdos)) %>% 
+                    ggplot(mapping = aes(x = factor(Ambito),y = DiasObsrvdos)) +
+                    geom_dotplot( mapping = aes(fill = factor(Abandono)), binaxis = 'y',stackdir = 'center', dotsize = 0.5, binwidth = 35, position = position_dodge(0.3)) +
+                    geom_boxplot(aes(fill = factor(Ambito)),alpha = 0.2)
+
+
+gdot_times_pobreza <-  clientes[index2,] %>% 
+                        select(DiasObsrvdos, en_mora, Abandono, NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas) %>% 
+                        gather(NoDisponible, R_0_18, R_18_34, R_34_50, R_50_70, R_70_100, UnaVivHabitada, SinVivHabitadas, key = 'Pobreza', value = 'dummie') %>% 
+                        filter(dummie == '1') %>% 
+                        select(DiasObsrvdos:Pobreza) %>% 
+                        mutate(DiasObsrvdos = as.integer(DiasObsrvdos)) %>% 
+                        ggplot(mapping = aes(Pobreza, DiasObsrvdos)) +
+                        geom_dotplot( mapping = aes(fill = factor(Abandono)), binaxis = 'y',stackdir = 'center', dotsize = 0.5, binwidth = 25, position = position_dodge(0.3)) +
+                        geom_boxplot(alpha = 0.2) +
+                        theme_bw()
+
+
+
+```
+
+
+Vemos que hay una diferencia fuerte al hacer caso o no la censura en la media para ambos grupos.
+
+
+Sería bueno ver proporciones de censura por grupo
+
 
 ### Localización
 
