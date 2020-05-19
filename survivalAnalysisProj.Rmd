@@ -171,6 +171,8 @@ gdot_times_pobreza <-  clientes[index2,] %>%
                         geom_boxplot(alpha = 0.2) +
                         theme_bw()
 
+gdot1_times
+gdot2_times
 
 
 ```
@@ -195,6 +197,447 @@ clientes %>% ggplot(mapping = aes(x = lon, y = lat)) +
 
 
 ```
+
+
+# EDA proyecto escrito
+
+
+## Número de transacciones
+
+
+```{r}
+
+# individual boxplot
+bxplt_tr <- clientes %>% 
+            ggplot(  aes( x = '.', y = NumTransx)) +
+            geom_jitter( aes( colour = factor(Abandono)), alpha = 0.1, width = 0.5 ) +
+            geom_boxplot( alpha = 0.5) 
+
+bxplt_tr2 <- clientes %>% 
+            ggplot(  aes( x = '0.5', y = NumTransx)) +
+            geom_jitter( aes( colour = factor(Abandono)), alpha = 0.1, width = 0.5 ) +
+            geom_violin( aes( fill = factor( Abandono), group = factor( Abandono) ),alpha = 0.5, position = position_dodge(1)) +
+            geom_boxplot( alpha = 0.5)
+
+bxplt_tr_censored <- clientes %>% 
+            ggplot(  aes( x = '.', y = NumTransx)) +
+            geom_boxplot(aes(color = factor(Abandono)), alpha = 0.9) +
+            geom_dotplot(mapping = aes(fill = factor(Abandono)),binaxis = 'y', stackdir = 'center', dotsize = 0.1, alpha = 0.1, binwidth = 5 ) 
+
+bxplt_tr_censored2 <- clientes %>% 
+            ggplot(  aes( x = factor(Abandono), y = NumTransx)) +
+            geom_boxplot(aes(color = factor(Abandono)), alpha = 0.9) +
+            geom_dotplot(mapping = aes(fill = factor(Abandono)),binaxis = 'y', stackdir = 'center', dotsize = 0.1, alpha = 0.1, binwidth = 5 ) 
+
+
+
+# kernel denisty and histogram
+dsty_tr <- clientes %>% 
+            ggplot( aes(x = NumTransx) ) +
+            geom_histogram(aes(y = ..density..), fill = '#BEDDE4', color = 1  ) +
+            geom_density( kernel = 'epanechnikov', color = 'blue') 
+
+bxplt_tr
+bxplt_tr2
+bxplt_tr_censored
+bxplt_tr_censored2
+dsty_tr
+
+
+
+```
+
+## Días observados
+
+
+```{r}
+# box plot
+
+
+bxplt_days1 <- clientes %>% 
+              ggplot(aes(x = '.', y = DiasObsrvdos)) +
+              geom_jitter( aes( color = factor( Abandono)), alpha = 0.1, width = 0.5) +
+              geom_violin( alpha = 0.5) + 
+              geom_boxplot( alpha = 0.5 ) 
+
+
+
+
+bxplt_days2 <- clientes %>% 
+              ggplot(aes(x = factor(Abandono), y = DiasObsrvdos)) +
+              geom_boxplot(aes( color = factor(Abandono)), ) +
+              geom_dotplot( mapping = aes( fill = factor( Abandono)) , binaxis = 'y', stackdir = 'center', dotsize = 0.5, alpha = 0.1, binwidth = 5)
+
+
+# denisty
+dsty_days <- clientes %>% 
+            ggplot( aes(x = DiasObsrvdos) ) +
+            geom_histogram(aes(y = ..density..), fill = '#BEDDE4', color = 1  ) +
+            geom_density( kernel = 'epanechnikov', color = 'blue', size = 1, bw = 'SJ-dpi') +
+            geom_density( kernel = 'gaussian', color = 'green', size = 1, bw = 30) 
+
+dsty_days_c1 <- clientes %>% 
+                ggplot( aes(x = DiasObsrvdos) ) +
+                geom_density( mapping =  aes( fill = factor( Abandono)), kernel = 'epanechnikov', position = 'stack')
+
+dsty_days_c2 <- clientes %>% 
+                ggplot( aes(x = DiasObsrvdos) ) +
+                geom_density( mapping =  aes( fill = factor( Abandono)), kernel = 'epanechnikov', alpha = 0.4)
+
+
+bxplt_days1
+bxplt_days2
+dsty_days
+dsty_days_c1
+dsty_days_c2
+
+
+
+
+
+```
+
+# Análisis de supervivencia
+
+A continuación estimemos la supervivencia de los usuarios.
+
+## Sin covariables
+
+Estimacion
+
+```{r}
+
+# total data
+xfit <- survfit( Surv(time = DiasObsrvdos, event = Abandono) ~ 1, 
+                 data = clientes, conf.type = 'plain', # linear conf int
+                 start.time = 0)
+
+
+
+
+# trans
+xfit_t <- survfit( Surv(time = DiasObsrvdos, event = Abandono) ~ NumTransx, 
+                 data = clientes, conf.type = 'plain', # linear conf int
+                 start.time = 0)
+
+```
+
+Notas: La estimacion KM con covariables numéricas, cambia muchísimo por la gran cantidad de "niveles". Hay dos opciones:
+
+- Recodificar y dejar pocas categorias
+- 
+
+
+
+Tablas de supervivencia
+```{r}
+table_km <- clientes %>% mutate( time = DiasObsrvdos, censored = Abandono) %>% table_KM_surv()
+
+# observe tables
+# table_km %>% head() %>% knitr::kable()
+# table_km %>% tail() %>% knitr::kable()
+
+```
+
+## KM plots
+
+```{r}
+#plot 1
+gg_surv_km <- ggsurvplot(xfit, 
+            surv.median.line = c('hv'),
+            conf.int = TRUE,
+            linetype = 'solid',
+            censor.shape = 39,
+            legend.title = 'Tiempo de Churn',
+            legend.labs = '',
+            xlab = 'Dias',
+            ylab = 'Probabilidad de abandono')
+
+# plot 2
+plot(xfit, col = c(1,2,2)) #i think this is better
+
+ # ggsurvplot(xfit_t, 
+ #            surv.median.line = c('hv'),
+ #            legend.title = 'Tiempo de Churn',
+ #            xlab = 'Dias',
+ #            ylab = 'Probabilidad de abandono')
+
+gg_surv_km
+```
+
+## Gráficas diagnositico para modelos de regresión
+
+Al ser una variable numérica, debemos ver los tiempos sin la covariable
+
+En el caso que se reetiquete el número de transacciones, se puede hacer un análisis parecido al del profesor para el caso del voltaje.
+
+### Sin covariables
+```{r}
+# time and KM
+tj <- xfit$time
+Sj <- xfit$surv
+```
+
+
+#### QQ plots
+
+__Log normal__
+
+```{r}
+ln_T <- scale(log(tj))
+
+#graph1
+qqnorm(ln_T)
+
+#graog2
+g_qqnorm <- tibble( tj = ln_T) %>% 
+            ggplot(aes(sample = tj)) +
+            stat_qq(shape = 1, color = '#808080') + 
+            stat_qq_line( color = '#008080', size = 1)
+g_qqnorm
+
+```
+
+__Weibull__
+
+#### Linearización del modelo
+
+ There are multiple ways to parameterize a Weibull distribution. The survreg 
+ function embeds it in a general location-scale family, which is a 
+ different parameterization than the rweibull function, and often leads
+
+Importante:
+  survreg's scale  =    1/(rweibull shape)
+   survreg's intercept = log(rweibull scale)
+
+En r, _shape_ es $a$ y _scale_ es $b$ de la siguiente parametrización:
+
+$$ f(x) = (a/b) (x/b)^{a-1} exp(- (x/b)^a)$$
+
+```{r}
+xfitr_weib <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'weibull')
+
+#adjusted values
+a <- 1 / xfitr_weib$scale
+b <- exp(xfitr_weib$coef) 
+
+#graph
+x <- seq(from = 0, to = 10, length.out = 2000)
+y <- dweibull(x = x, shape = a, scale = b)
+
+plot(x,y) #look weibull dist
+
+#qqweibull
+n <- length(Sj)
+pp <- seq(from = 0, to = 1, length.out = n)
+tjp <- qweibull(p = pp, shape = a, scale = b)
+
+# FALTA encontrar los cuantiles de la weibull
+
+qqplot(tjp)
+
+```
+
+
+
+
+__ Exponencial __
+
+```{r}
+
+# grph 1
+g_dgs_exp <- tibble(tj, Sj) %>% 
+              ggplot( ) +
+              geom_line( mapping = aes( x = tj, y = log(Sj) ))
+
+
+# adjust line (maybe with a grid)
+# g_dgs_expL <- g_dgs_exp +
+#               geom_line( mapping = aes( x = ) )
+# 
+# g_dgs_exp
+
+
+
+```
+
+__ Weibull __
+
+```{r}
+g_dgs_wbl <- tibble( tj, Sj) %>% 
+              ggplot() +
+              geom_line( mapping = aes( log(tj), log( - log( Sj))) )
+
+g_dgs_wbl
+
+
+```
+
+Por las gráficas anteriores, los datos sugieren un modelo Exponencial.
+
+
+## Ajuste de los modelos
+
+```{r}
+#fits of distributions saw in class
+xfitr_weib <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'weibull')
+xfitr_ll<- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'loglogistic')
+xfitr_ln <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'lognormal')
+xfitr_e <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'exponential')
+xfitr_ex <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'extreme')
+
+
+xfitr_weib
+xfitr_ll
+xfitr_ln
+xfitr_e
+xfitr_ex
+
+```
+
+
+__NOTA__ A pesar que los datos visualmente se ajustaban mejor para la exponencial, la lognormal (la mejor por poco) y la weibull son las mejores aproximaciones paramétricas a los datos ajustados. Veremos de todos modos el criterio de Akaike para verlo.
+
+```{r}
+extractAIC(xfitr_weib)
+extractAIC(xfitr_ln)
+extractAIC(xfitr_e)
+
+
+```
+
+Por lo visto, se reafirma que el mejor modelo es el lognormal seguido del weibull por poco.
+
+Última comprobación es con ver cómo se ajustan las curvas con el el estimado del KM
+
+```{r}
+# quantiles
+n <- xfit$n
+
+# predict
+qs <- 1:98/100
+predw <- predict(xfitr_weib, type="quantile", p = 1- qs, se = TRUE)
+predln <- predict(xfitr_ln, type="quantile", p = 1- qs, se = TRUE)
+prede <- predict(xfitr_e, type="quantile", p = 1- qs, se = TRUE)
+predll <- predict(xfitr_ll, type="quantile", p = 1- qs, se = TRUE)
+predex <- predict(xfitr_ex, type="quantile", p = 1- qs, se = TRUE)
+
+
+plot( xfit)
+lines( predw$fit[1,], qs, col = 2 )
+lines( predln$fit[1,], qs, col = 3 )
+lines( prede$fit[1,], qs, col = 4 )
+lines( predll$fit[1,], qs, col = 5 )
+lines( predex$fit[1,], qs, col = 6 )
+
+
+```
+
+Sin embargo, el mejor ajuste en la curva es el modelo exponencial. (Se puede ajustar la prueba Kolomgorov Smirnoff para aumentar la confianza estadística).
+
+Prueba kolmogorv
+```{r}
+# got stuck
+
+# ks.test(tj, 1-'pweibull', ,alternative = 'two.side')
+```
+
+
+## Covariables
+
+### Num Trans Numérica y Ámbito
+
+En esta parte veremos como se ajustan los modelos weibull y lognormal con las covariables _Numero de trans_ y _Marginación_. (Urbana, Rural)
+
+```{r}
+sfitr_w <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ NumTransx + factor(Ambito), data = clientes, dist = 'weibull')
+
+# (ponerlo en bonito)
+summary(sfitr_w)
+anova(sfitr_w)
+```
+
+
+Por la tabla de ANOVA, vemos que ambos factores aportan información de manera marginal.
+
+-- Falta interpretar los coeficientes de la regresión --
+
+Observemos las curvas para distintas predicciones
+
+```{r}
+# setp 1: parametric model adjust 
+
+# setp 2: variables to predict
+newdat <- expand.grid( NumTransx = c(1, 5, 10), 
+                      Ambito = levels(as.factor(clientes$Ambito)))
+
+# step 3: compute several curves
+surv <- seq(.99, .1, by = -.01)
+ti <- predict(sfitr_w, type = 'quantile', p = 1 - surv, newdata = newdat)
+
+# setp4: create df with sruvival curves
+newdat_wide <- cbind(newdat, ti)
+surv_df <- reshape2::melt(newdat_wide,
+                          id.vars = c('NumTransx','Ambito'),
+                          variable.name = 'surv_id',
+                          value.name = 'time')
+surv_df$surv <- surv[ as.numeric(surv_df$surv_id)]
+surv_df[,c('upper', 'lower', 'std.err', 'strata')] <- NA
+
+# step5: plot
+
+# survival
+g1 <- ggsurvplot_df( surv_df,
+               surv.geom = geom_line,
+               linetype = 'Ambito',
+               color = 'NumTransx',
+               legend.title = NULL,
+               surv.median.line = c('hv'))
+
+# distribution
+
+g2 <- ggsurvplot_df( surv_df,
+               fun = 'event',
+               surv.geom = geom_line,
+               linetype = 'Ambito',
+               color = 'NumTransx',
+               legend.title = NULL,
+               surv.median.line = c('hv'))
+
+# cummulative hazard
+
+g3 <- ggsurvplot_df( surv_df,
+               fun = 'cumhaz',
+               surv.geom = geom_line,
+               linetype = 'Ambito',
+               color = 'NumTransx',
+               legend.title = NULL,
+               surv.median.line = c('hv'))
+
+g1
+g3
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

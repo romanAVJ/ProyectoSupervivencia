@@ -299,7 +299,6 @@ table_KM_surv <- function(df){
   return(df)
 }
 
-
 table_NA <- function(df){
   #kaplan meier fit
   sfit <- survfit(Surv(time,censored) ~ 1, data = df)
@@ -456,3 +455,6 @@ left_trunc <- function(t0, ui, ti, closed = TRUE){
     r <-  length( which (ui < t0 & t0 <= ti ))    
   return(r)
 }
+
+
+
