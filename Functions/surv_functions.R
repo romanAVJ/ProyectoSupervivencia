@@ -198,6 +198,17 @@ quantile_ci <- function(St, ee, tj, p = 0.5, alpha = 0.05){
   return(c(ci_lower,ci_upper))
 }
 
+CoxSnellResidual <- function (standRes, weight = 1, dist = 'weibull'){
+  # standarize residuals
+  standRes <- standRes[rep(seq_len(length(standRes)), weight)]
+  
+  if (dist=="lognormal") {csr <- -log(1-pnorm(standRes))}
+  else if (dist=="weibull") {csr <- -log(exp(-exp(standRes)))}
+  
+  return( csr)
+}
+
+
 #### ========================= ROUTINES ===================================
 censor_time <- function(df, column = 1){
   # times

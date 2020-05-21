@@ -414,6 +414,8 @@ En r, _shape_ es $a$ y _scale_ es $b$ de la siguiente parametrización:
 
 $$ f(x) = (a/b) (x/b)^{a-1} exp(- (x/b)^a)$$
 
+-- no sirve de mucho --
+
 ```{r}
 xfitr_weib <- survreg(Surv(time = DiasObsrvdos, event = Abandono) ~ 1,  data = clientes, dist = 'weibull')
 
@@ -432,9 +434,6 @@ n <- length(Sj)
 pp <- seq(from = 0, to = 1, length.out = n)
 tjp <- qweibull(p = pp, shape = a, scale = b)
 
-# FALTA encontrar los cuantiles de la weibull
-
-qqplot(tjp)
 
 ```
 
@@ -620,6 +619,101 @@ g3
 ```
 
 
+### Residuos Cox Snell modelo parametrico
+
+Basados en los apuntes (poner fórmula) y http://blogs2.datall-analyse.nl/2016/02/19/rcode_martingale_residuals_aft_model/
+
+```{r}
+# time
+tj <- clientes$DiasObsrvdos %>% as.numeric()
+
+#null regression model
+nmod <- survreg( Surv(time = DiasObsrvdos, event = Abandono) ~ 1, data = clientes, dist = 'weibull')
+
+# standarized residuals
+linfit <- predict( nmod, type = 'lp') #linear predictor
+zi <-  (log( tj) - linfit) / nmod$scale
+
+
+# cox snell (from functions)
+coxsnellres_w <- CoxSnellResidual( zi)
+
+# using Nelson Aalen to estimate cummulatieve hzazard
+fitresw <- survfit( coxph( Surv( coxsnellres_w, clientes$Abandono) ~ 1), type = 'fleming-harrington') # NA S(t)
+Ht <- - log( fitresw$surv )
+
+
+# plot 
+plot( fitresw$time, Ht, type = 's', xlab = 'Cox-Snell Residuales', ylab = 'H(t)')
+abline(a = 0, b = 1, col = 'navy' )
+
+```
+
+Podemos observar un buen ajuste en el modelo paramétrico.
+
+
+# Modelo de Cox
+
+Ajustaremos un modelo semiparamétrico para los datos con las mismas covariables y veremos su desempeño.
+
+Según la documentación, usamos el _método de Breslow_ (como lo visto en clase).
+
+```{r}
+# estimate cox model
+clientes <- clientes %>% mutate(Ambito = factor(Ambito))
+cfit <- coxph( Surv( time = DiasObsrvdos, event = Abandono) ~ NumTransx + Ambito, data = clientes)
+
+# look model fit
+summary(cfit)
+
+
+```
+
+Vemos que se rechaza las hipótesis que los parámetros sean cero de manera significativa y que el modelo en general sea constante. Por tanto tenemos un excelente ajuste de modelo.
+
+Igualemente ningún parámetro tiene su correspondiente IC pasando por el 1, por tanto son distintos de cero.
+
+A continuación vemos como se vé el modelo de Cox para estos datos
+
+```{r}
+# step 1: cox fit
+
+# step 2: combination of covariables
+newdat <- expand.grid( NumTransx = c(1, 5, 10), 
+                      Ambito = levels(as.factor(clientes$Ambito)))
+
+rownames( newdat) <- letters[1:6] #6 combinations 
+
+# step 3: compute curves
+cxsf <- survfit( cfit, data = clientes, newdata = newdat, conf.type = 'none')
+
+# step 4: create data frame
+surv_cx <- surv_summary(cxsf)
+
+
+surv_csmod <- cbind(surv_cx, newdat[ as.character( surv_cx$strata), ])
+
+# step 5: plot
+ggsurvplot_df( surv_csmod,
+              linetype = 'Ambito',
+              color = 'NumTransx',
+              legend.title = NULL,
+              censor = FALSE)
+
+
+```
+
+Overal plot
+```{r}
+
+ggsurvplot( survfit(cfit), data = clientes, censor = FALSE)
+
+
+```
+
+
+
+## Analisis de residuales del modelo Cox
 
 
 
@@ -627,8 +721,139 @@ g3
 
 
 
+### Parametros
+ 
+```{r}
+ggforest(cfit, data = clientes)
+
+```
 
 
+
+### Residuales
+
+#### Test para riesgos proporcionales
+Residuales schoenfeld
+
+
+
+```{r}
+# schoenfeld residuals
+test.res <- cox.zph( cfit)
+
+# plot schoenfeld residuals
+test.res
+ggcoxzph( test.res)
+
+```
+
+Por la prueba de Schoenfeld, vemos que el supuesto de riesgos proporcionales NO es válido globalmente, solo para el ámbito urbano puede ser factible.
+
+según http://www.sthda.com/english/wiki/cox-model-assumptions :
+
+Note that, systematic departures from a horizontal line are indicative of non-proportional hazards, since proportional hazards assumes that estimates β1,β2,β3 do not vary much over time.
+
+En estas gráficas SI vemos que las covariables cambian con el tiempo en el caso del número de transacciones, lo cual es de esperarse.
+
+Igualmente, la interpretaión de no centralidad al rededor del 0 http://www.math.ucsd.edu/~rxu/math284/slect9.pdf afirma de nuevo esto.
+
+
+```{r}
+
+ggcoxdiagnostics( cfit, type = 'martingale')
+ggcoxdiagnostics( cfit, type = 'deviance', linear.predictions = FALSE, alpha = 0.4)
+
+
+```
+Aunque la devianza pareciera estar cercana al cero.
+
+
+#### Residuos cox snell
+
+Según https://rpubs.com/kaz_yos/resid_cox y http://biostat.mc.vanderbilt.edu/wiki/pub/Main/QingxiaChen/Ch11.pdf (el de la foto de clase), para obtener lo residuos cox-snell.
+
+Cómo se calucla un resiudo martingala: https://www.jstor.org/stable/2336057?seq=2#metadata_info_tab_contents 
+
+Calculamos el residuo Cox Snell a partir de lo siguiente:
+
+1. Calculamos los residuos martingala del modelo de cox.
+2. Equivalencia $r_{cs}^{i} = \delta^{i} - r_{M}^{i} $
+3. Calculamos $e_{i} = H(r_{cs}^{i} | x_{i}, \theta_{i}) $ vía Fleming Harrington $H(t) = - ln( S(t) )$
+
+
+```{r}
+# internet method
+coxsnellres <- clientes$Abandono - resid( cfit, type = "martingale" )
+
+
+# using Nelson Aalen to estimate cummulatieve hzazard
+fitres <- survfit( coxph( Surv( coxsnellres, clientes$Abandono) ~ 1), type = 'fleming-harrington') # NA S(t)
+Ht <- - log( fitres$surv )
+
+
+# plot 
+plot( fitres$time, Ht, type = 's', xlab = 'Cox-Snell Residuales', ylab = 'H(t)')
+abline(a = 0, b = 1, col = 'navy' )
+
+
+
+```
+
+Se puede ver el pobre ajuste para el modelo semiparametrico.
+
+## Modelo Cox con covariables dependientes del tiempo: Modelo Aditivo de Aalen
+
+Ajuste
+
+```{r}
+# fit model
+afit <- aareg( Surv(time = DiasObsrvdos, event = Abandono) ~ NumTransx + Ambito, data = clientes)
+
+# summary
+summary(afit)
+
+```
+
+Graficar
+
+```{r}
+plot(afit)
+
+```
+
+Con el modelo aditivo de Aalen podemos ver como el Número de transacciones es dependiente del tiempo, como la misma intuición lo dice, mientras que l ámbito no. Es por esto que un modelo semiparamétrico no es el correcto para este tipo de datos.
+
+# Comparar los tres modelos
+
+A continuación graficaremos los ajustes KM, regresión paramétrica y el modelo de Cox.
+http://rstudio-pubs-static.s3.amazonaws.com/5560_c24449c468224fd4af9f3e512a24e07d.html
+
+## Ajustes Nulos
+
+El único que se queda con el peso de las covariables es el modelo de Cox
+
+```{r}
+# survival curves withour covariates
+km.null <- survfit( Surv( time = DiasObsrvdos, event = Abandono) ~ 1, data = clientes, conf.type = 'plain')
+reg.null <- survreg( Surv( time = DiasObsrvdos, event = Abandono) ~ 1, data = clientes, dist = 'weibull')
+
+# predictions
+qs <- 1:98/100
+predr <- predict(reg.null, type = 'quantile', p = 1- qs, se = TRUE)
+
+
+# plot
+plot( km.null, conf.int = 'none') #KM
+lines( predr$fit[1,], qs, col = 2) # weibull
+lines( survfit( cfit), conf.int = 'none', col = 3)
+## Add legends
+legend(x = "topright",
+       legend = c("Kaplan-Meier", "Cox (Efron)", "Weibull"),
+       lwd = 2, bty = "n",
+       col = c("black", "green", "red"))
+
+
+```
 
 
 
