@@ -454,7 +454,7 @@ g_dgs_exp <- tibble(tj, Sj) %>%
 # g_dgs_expL <- g_dgs_exp +
 #               geom_line( mapping = aes( x = ) )
 # 
-# g_dgs_exp
+g_dgs_exp
 
 
 
@@ -501,6 +501,8 @@ __NOTA__ A pesar que los datos visualmente se ajustaban mejor para la exponencia
 extractAIC(xfitr_weib)
 extractAIC(xfitr_ln)
 extractAIC(xfitr_e)
+extractAIC(xfitr_ex)
+extractAIC(xfitr_ll)
 
 
 ```
